@@ -33,7 +33,7 @@ resource "aws_subnet" "public1" {
   cidr_block = var.subnet1_public_cidr
 
   tags = {
-    "Name" = "sjb-${region_prefix}-public-1"
+    "Name" = "sjb-${var.region_prefix}-public-1"
   }
 }
 
@@ -42,7 +42,7 @@ resource "aws_subnet" "private1" {
   cidr_block = var.subnet1_private_cidr
 
   tags = {
-    "Name" = "sjb-${region_prefix}-private-1"
+    "Name" = "sjb-${var.region_prefix}-private-1"
   }
 }
 
@@ -53,6 +53,6 @@ resource "aws_subnet" "private2" {
   cidr_block = var.subnet2_private_cidr
 
   tags = {
-    "Name" = "sjb-${region_prefix}-private-2"
+    "Name" = "sjb-${var.region_prefix}-private-2"
   }
 }
