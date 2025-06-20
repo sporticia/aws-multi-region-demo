@@ -39,7 +39,7 @@ resource "aws_s3_object" "data01" {
 }
 
 ## data02 conditional bucket
-# data02 bucket should be eu-north01/Stockholm only
+# data02 bucket should be eu-north-1/Stockholm only
 resource "aws_s3_bucket" "data02" {
   count  = var.just_eu_north_1 == true ? 1 : 0
   bucket = "sjb-${var.region_prefix}-data02"
