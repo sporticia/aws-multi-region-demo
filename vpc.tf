@@ -31,11 +31,19 @@ resource "aws_default_security_group" "default" {
 resource "aws_subnet" "public1" {
   vpc_id     = aws_vpc.vpc01.id
   cidr_block = var.subnet1_public_cidr
+
+  tags = {
+    "Name" = "sjb-${region_prefix}-public-1"
+  }
 }
 
 resource "aws_subnet" "private1" {
   vpc_id     = aws_vpc.vpc01.id
   cidr_block = var.subnet1_private_cidr
+
+  tags = {
+    "Name" = "sjb-${region_prefix}-private-1"
+  }
 }
 
 # Add a second private subnet for eu-north-1/Stockholm only
@@ -43,4 +51,8 @@ resource "aws_subnet" "private2" {
   count      = var.just_eu_north_1 == true ? 1 : 0
   vpc_id     = aws_vpc.vpc01.id
   cidr_block = var.subnet2_private_cidr
+
+  tags = {
+    "Name" = "sjb-${region_prefix}-private-2"
+  }
 }
