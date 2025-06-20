@@ -1,0 +1,136 @@
+name: matrix terraform plan
+
+on:
+  workflow_call:
+    inputs:
+      ENVIRONMENT:
+        description: The GitHub environment being deployed to
+        required: false
+        type: string
+      REGION:
+        description: Region to run job as (prefix only - e.g eu-north-1, eu-west-2)
+        type: string
+        required: true
+      CONFIG_FOLDER_PATH:
+        description: The base path of the Terraform config you are wanting to plan
+        type: string
+        required: true
+
+permissions:
+  id-token: write # Required for fetching an OIDC token.
+  contents: read # Required for actions/checkout.
+  pull-requests: write # Required to post plan to PR comment.
+
+env:
+  AWS_REGION: ${{ inputs.REGION }}
+
+jobs:
+  terraform-plan:
+    name: terraform-plan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Code checkout 🔄
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Configure aws credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Terraform 🛠️
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          # This needs to be true to get stdout and std error from the tf-plan step
+          # https://github.com/marketplace/actions/hashicorp-setup-terraform#outputs
+          terraform_wrapper: true
+
+      - name: Terraform Init 🔧
+        run: terraform -chdir=${{ inputs.CONFIG_FOLDER_PATH }} init -backend-config=./backend/${{ inputs.REGION }}.cfg
+
+      # Validate terraform files
+      - name: Terraform Validate 🔍
+        run: terraform validate
+
+      # Check terraform files formatting
+      - name: Terraform Format Check 🎨
+        run: terraform fmt -check -recursive
+
+      # Static scan terraform code
+      - name: Checkov Code Scan 🕵🏻‍♂️
+        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf #v12.1347.0
+        id: checkov-scan
+        with:
+          directory: ${{ inputs.CONFIG_FOLDER_PATH }}
+          download_external_modules: true
+          skip_check: CKV2_AWS_11
+          hard_fail_on: HIGH,CRITICAL
+          output_format: cli
+          quiet: true
+        continue-on-error: false
+
+      # Run terraform plan
+      - name: Terraform Plan 🧩
+        id: tf-plan
+        run: |
+          terraform -chdir=${{ inputs.CONFIG_FOLDER_PATH }} plan -input=false -no-color -out=tf.plan -var-file=./tfvars/common.tfvars -var-file=./tfvars/${{ inputs.REGION }}.tfvars
+        continue-on-error: false
+
+      # Publish terraform plan as PR comment
+      - id: pr-comment
+        name: Post comment to Pull Request
+        continue-on-error: true
+        uses: actions/github-script@v7
+        if: (success() || failure()) && github.event_name == 'pull_request'
+        env:
+          PLAN_STDOUT: "${{ steps.tf-plan.outputs.stdout }}"
+          PLAN_STDERR: "${{ steps.tf-plan.outputs.stderr }}"
+        with:
+          script: |
+            // Retrieve existing bot comments for the PR
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            })
+            const botComment = comments.find(comment => {
+              return comment.user.type === 'Bot' && comment.body.includes('Terraform Format and Style')
+            })
+
+            // Prepare format of the comment
+            const output = `#### Terraform Plan 📖 \`${{ steps.tf-plan.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+            #### stdout
+            \`\`\`
+            ${process.env.PLAN_STDOUT}
+            \`\`\`
+
+            #### stderr
+            \`\`\`
+            ${process.env.PLAN_STDERR}
+            \`\`\`
+
+            </details>
+
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            // If we have a comment, update it, otherwise create a new one
+            if (botComment) {
+              github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: output
+              })
+            } else {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: output
+              })
+            }
