@@ -13,9 +13,24 @@ variable "vpc_cidr" {
   description = "VPC IP CIDR range."
 }
 
+variable "subnet1_public_cidr" {
+  type        = string
+  description = "Public subnet1 IP CIDR range."
+}
+
+variable "subnet1_private_cidr" {
+  type        = string
+  description = "Private subnet1 IP CIDR range."
+}
+
+variable "subnet2_private_cidr" {
+  type        = string
+  description = "Private subnet2 IP CIDR range."
+}
+
 variable "bucket_encryption_key_arn" {
   type        = string
-  description = "Encryption key ARN to use for S3 bucket"
+  description = "Encryption key ARN to use for S3 bucket."
 }
 
 variable "just_eu_north_1" {

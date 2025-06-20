@@ -100,7 +100,7 @@ jobs:
             })
 
             // Prepare format of the comment
-            const output = `#### Terraform Plan 📖 \`${{ steps.tf-plan.outcome }}\`
+            const output = `#### Terraform Plan \`${{ inputs.REGION }}\` 📖 \`${{ steps.tf-plan.outcome }}\`
 
             <details><summary>Show Plan</summary>
 
